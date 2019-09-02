@@ -1,0 +1,252 @@
+# how to configure new job: https://github.com/kubernetes/test-infra/blob/master/prow/jobs.md#how-to-configure-new-jobs
+prowjob_namespace: default
+pod_namespace: test-pods
+log_level: debug
+
+presubmits:
+  qrr1995/tidb:
+  - name:  pull-tidb-unittests-0            # As for periodics.
+    annotations:
+      testgrid-dashboards: istio-postsubmits-master
+      testgrid-tab-name: test
+    labels:
+      preset-git-cache: "true"
+    decorate: true           # As for periodics.
+    clone_depth: 20
+    skip_submodules: true
+    always_run: true         # Run for every PR, or only when requested.
+    # skip_report: true        # Whether to skip setting a status on GitHub.
+    context: unit-test/0         # Status context. Defaults to the job name.
+    max_concurrency: 10      # As for postsubmits.
+    spec: {}                 # As for periodics.
+    branches: []             # As for postsubmits.
+    skip_branches: []        # As for postsubmits.
+    trigger: "(?m)unit test this( please)?" # Regexp, see discussion.
+    rerun_command: "unit test this please"  # String, see discussion.
+    #trigger: "(?m)qux test this( please)?" # Regexp, see discussion.
+    #rerun_command: "qux test this please"  # String, see discussion.
+    #
+    spec:
+      containers:
+      - image: hub.pingcap.net/jenkins/centos7_golang-1.12:cached_prow 
+        securityContext:
+          privileged: true
+        command: ["bash", "-c"]
+        args:
+        - "sleep 120;bash <(curl -s http://fileserver.pingcap.net/download/prow/clone.sh);mkdir -p /secrets/ssh/ssh-key-secret; mkdir -p /logs ;exit 1 "
+  - name:  pull-tidb-unittests-2            # As for periodics.
+    decorate: true           # As for periodics.
+    always_run: true         # Run for every PR, or only when requested.
+    # skip_report: true        # Whether to skip setting a status on GitHub.
+    context: unit-test/2         # Status context. Defaults to the job name.
+    max_concurrency: 10      # As for postsubmits.
+    spec: {}                 # As for periodics.
+    branches: []             # As for postsubmits.
+    skip_branches: []        # As for postsubmits.
+    trigger: "(?m)unit test this( please)?" # Regexp, see discussion.
+    rerun_command: "unit test this please"  # String, see discussion.
+    #trigger: "(?m)qux test this( please)?" # Regexp, see discussion.
+    #rerun_command: "qux test this please"  # String, see discussion.
+    #
+    spec:
+      containers:
+      - image: hub.pingcap.net/jenkins/centos7_golang-1.12:cached 
+        name: test_go 
+        securityContext:
+          privileged: true
+        command: ["bash", "-c"]
+        args:
+        - "echo How long does this job take for prepare?"
+        volumeMounts:
+        - mountPath: /home/prow/.cache/git
+          name: code-cache
+      volumes:
+      - name: code-cache
+        emptyDir: {}
+       # hostPath:
+       #   type: Directory
+
+
+
+
+
+#presubmits:
+periodics:
+  - interval: 12h
+    name: pull-kind-rebuild  # convention: (job type)-(repo name)-(suite name)
+    labels:
+      preset-service-account: "true"
+      preset-bazel-scratch-dir: "true"
+      preset-bazel-remote-cache-enabled: "true"
+      preset-dind-enabled: "true"
+      preset-kind-volume-mounts: "true"
+    decorate: true
+    annotations:
+      testgrid-dashboards: istio-postsubmits-master
+      testgrid-tab-name: test
+#    always_run: true
+    spec:
+      containers:
+      - image: hub.pingcap.net/k8s-testimages/bootstrap:latest-kind 
+        securityContext:
+          privileged: true    
+        command: ["bash", "-c"]
+        args:
+        - "chmod +x /usr/local/bin/kind; service docker start;kind create cluster;export KUBECONFIG=\"$(kind get kubeconfig-path --name=\"kind\")\"; kubectl cluster-info;kubectl get no;sleep 1000; kubectl get no ;kubectl -n kube-system get po ;date"
+#        - "k8s.io/kubernetes && ./../../sigs.k8s.io/kind/hack/ci/e2e.sh"
+        volumeMounts:
+        - mountPath: /etc/service-account
+          name: service
+          readOnly: true
+        - mountPath: /lib/modules
+          name: modules
+          readOnly: true
+        - mountPath: /sys/fs/cgroup
+          name: cgroup
+        - name: dind-storage
+          mountPath: /var/lib/docker
+        - name: graph
+          mountPath: /docker-graph
+      volumes:
+      - name: service
+        secret:
+          secretName: 
+            igcs-credentials-secret
+      - name: modules
+        hostPath:
+          path: /lib/modules
+          type: Directory
+      - name: cgroup
+        hostPath:
+          path: /sys/fs/cgroup
+          type: Directory
+      - name: dind-storage
+        emptyDir: {}
+      - name: graph
+        emptyDir: {}
+
+deck:
+  spyglass:
+    size_limit: 50000000 # 50MB
+    testgrid_config: gs://k8s-testgrid/config
+    testgrid_root: https://testgrid.k8s.io/
+    #gcs_browser_prefix: https://gcsweb.k8s.io/gcs/
+     
+    viewers:
+      "started.json|finished.json":
+      - "metadata"
+      "build-log.txt":
+      - "buildlog"
+      "artifacts/junit.*\\.xml":
+      - "junit"
+      "artifacts/filtered.cov":
+      - "coverage"
+    announcement: "testgrid and gcsweb are not availble now :("
+#    lenses:
+#    - lens:
+#        name: metadata   
+#      required_files:
+#      - started.json
+#      optional_files:
+#      - finished.json
+#    - lens:
+#        name: buildlog
+ #       config:
+ #         highlight_regexes:
+ #         - timed out
+ #         - 'ERROR:'
+ #         - (\s|^)(FAIL|Failure \[)\b
+ #         - (\s|^)panic\b
+ #         - ^E\d{4} \d\d:\d\d:\d\d\.\d\d\d]
+#      required_files:
+#            - build-log.txt
+#    - lens:
+#        name: junit
+#      required_files:
+#      - artifacts/junit.*\.xml
+    
+  rerun_auth_config:
+    github_users:
+      - qrr1995
+      - rrbot1995
+    github_team_ids:
+      - 2009231 #test-infra-admins
+plank:
+  allow_cancellations: true # whether to delete ProwJobs' pod (true) or not (false) when new instances are triggered for the same PR
+  # used to link to job results for decorated jobs (with pod utilities)
+  job_url_prefix: 'http://prow.pingcap.net/view/gcs'
+  # used to link to job results for non decorated jobs (without pod utilities)
+  job_url_template: 'http://prow.pingcap.net/view/gcs/pingcap-security-prow/pr-logs/pull/{{.Spec.Refs.Repo}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}'
+  report_template: '[Full PR test history](https://prow.pingcap.net/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}})'
+  default_decoration_config:
+    timeout: 4h
+    grace_period: 15s
+    utility_images: # pull specs for container images used to construct job pods
+      clonerefs: "hub.pingcap.net/k8s-prow/clonerefs:v20190813-2e6c6ee18-v8"
+      initupload: "hub.pingcap.net/k8s-prow/initupload:v20190813-2e6c6ee18-v1"
+      entrypoint: "gcr.io/k8s-prow/entrypoint:v20190813-2e6c6ee18"
+      sidecar: "gcr.io/k8s-prow/sidecar:v20190813-2e6c6ee18"
+    gcs_configuration: # configuration for uploading job results to GCS
+      bucket: "pingcap-security-prow"
+      path_strategy: explicit # or `legacy`, `single`
+      default_org: <github-org> # should not need this if `strategy` is set to explicit
+      default_repo: <github-repo> # should not need this if `strategy` is set to explicit
+    gcs_credentials_secret: "igcs-credentials-secret" 
+ # the name of the secret that stores the GCP service account credential JSON file, it expects the secret's key to be `service-account.json`
+    ssh_key_secrets:
+      - ssh-key-secret #  name of the secret that stores the bot's ssh keys for GitHub, doesn't matter what the key of the map is and it will just uses the values
+
+
+sinker:
+  resync_period: 15s
+  max_prowjob_age: 48h 
+  max_pod_age: 30m 
+
+tide:
+  sync_period: 1m
+  merge_method:
+    kubesphere-test/prow-tutorial: squash
+
+  target_url: http://prow.pingcap.net/tide
+  pr_status_base_url: http://prow.pingcap.net/pr
+  queries:
+  - repos:
+    - qrr1995/tidb 
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - do-not-merge
+    - do-not-merge/work-in-progress
+    - do-not-merge/hold
+    - do-not-merge/blocked-paths
+    - do-not-merge/invalid-owners-file
+
+  context_options:
+    from-branch-protection: true
+    skip-unknown-contexts: true
+
+
+
+periodics:
+- interval: 24h
+  #agent: jenkins
+  name: echo-testaaaaa
+  decorate: true
+  spec:
+    containers:
+    - image: alpine
+      command: ["/bin/date"]
+
+presets:
+- labels:
+    preset-git-cache: "true"
+  volumes:
+  - name: prow-cache
+    hostPath:
+      path: /data1/prow-cache
+      #type: Directory
+  volumeMounts:
+  - name: prow-cache
+    mountPath: /home/pingcap-cache
+

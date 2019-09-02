@@ -1,0 +1,19 @@
+plugins:
+  qrr1995/tidb:
+  - size
+  - cat
+  - shrug
+  - pony
+  - approve
+  - lgtm
+  - slackevents
+  - trigger
+  - slackevents
+  - lifecycle
+  - blockade
+  - blunderbuss
+  - assign
+  - verify-owners
+  - wip
+  - hold
+  - help
