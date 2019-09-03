@@ -12,7 +12,7 @@ presubmits:
     labels:
       preset-git-cache: "true"
     decorate: true           # As for periodics.
-    clone_depth: 20
+#    clone_depth: 20
     skip_submodules: true
     always_run: true         # Run for every PR, or only when requested.
     # skip_report: true        # Whether to skip setting a status on GitHub.
@@ -33,7 +33,7 @@ presubmits:
           privileged: true
         command: ["bash", "-c"]
         args:
-        - "sleep 120;bash <(curl -s http://fileserver.pingcap.net/download/prow/clone.sh);mkdir -p /secrets/ssh/ssh-key-secret; mkdir -p /logs ;exit 1 "
+        - "sleep 0;mkdir -p /secrets/ssh/ssh-key-secret; mkdir -p /logs;bash <(curl -s http://fileserver.pingcap.net/download/prow/clone.sh);mkdir -p /secrets/ssh/ssh-key-secret; mkdir -p /logs ; sleep 120"
   - name:  pull-tidb-unittests-2            # As for periodics.
     decorate: true           # As for periodics.
     always_run: true         # Run for every PR, or only when requested.
@@ -76,8 +76,6 @@ periodics:
     name: pull-kind-rebuild  # convention: (job type)-(repo name)-(suite name)
     labels:
       preset-service-account: "true"
-      preset-bazel-scratch-dir: "true"
-      preset-bazel-remote-cache-enabled: "true"
       preset-dind-enabled: "true"
       preset-kind-volume-mounts: "true"
     decorate: true
@@ -98,31 +96,14 @@ periodics:
         - mountPath: /etc/service-account
           name: service
           readOnly: true
-        - mountPath: /lib/modules
-          name: modules
-          readOnly: true
-        - mountPath: /sys/fs/cgroup
-          name: cgroup
         - name: dind-storage
           mountPath: /var/lib/docker
-        - name: graph
-          mountPath: /docker-graph
       volumes:
       - name: service
         secret:
           secretName: 
             igcs-credentials-secret
-      - name: modules
-        hostPath:
-          path: /lib/modules
-          type: Directory
-      - name: cgroup
-        hostPath:
-          path: /sys/fs/cgroup
-          type: Directory
       - name: dind-storage
-        emptyDir: {}
-      - name: graph
         emptyDir: {}
 
 deck:
@@ -183,7 +164,7 @@ plank:
     grace_period: 15s
     utility_images: # pull specs for container images used to construct job pods
       clonerefs: "hub.pingcap.net/k8s-prow/clonerefs:v20190813-2e6c6ee18-v8"
-      initupload: "hub.pingcap.net/k8s-prow/initupload:v20190813-2e6c6ee18-v1"
+      initupload: "hub.pingcap.net/k8s-prow/initupload:v20190813-2e6c6ee18-v2"
       entrypoint: "gcr.io/k8s-prow/entrypoint:v20190813-2e6c6ee18"
       sidecar: "gcr.io/k8s-prow/sidecar:v20190813-2e6c6ee18"
     gcs_configuration: # configuration for uploading job results to GCS
@@ -228,16 +209,22 @@ tide:
 
 
 
-periodics:
-- interval: 24h
+#periodics:
+#- interval: 24h
   #agent: jenkins
-  name: echo-testaaaaa
-  decorate: true
-  spec:
-    containers:
-    - image: alpine
-      command: ["/bin/date"]
+#  name: echo-testaaaaa
+#  decorate: true
+#  spec:
+ #   containers:
+  #  - image: alpine
+   #   command: ["/bin/date"]
 
+github_reporter:
+  job_types_to_report:
+  - presubmit
+  - postsubmit
+
+# git code cache
 presets:
 - labels:
     preset-git-cache: "true"
@@ -249,4 +236,43 @@ presets:
   volumeMounts:
   - name: prow-cache
     mountPath: /home/pingcap-cache
-
+# enable GOPROXY by default
+- env:
+  - name: GOPROXY
+    value: "https://proxy.golang.org"
+# volume mounts for kind
+- labels:
+    preset-kind-volume-mounts: "true"
+  volumeMounts:
+    - mountPath: /lib/modules
+      name: modules
+      readOnly: true
+    - mountPath: /sys/fs/cgroup
+      name: cgroup
+  volumes:
+    - name: modules
+      hostPath:
+        path: /lib/modules
+        type: Directory
+    - name: cgroup
+      hostPath:
+        path: /sys/fs/cgroup
+        type: Directory
+# docker-in-docker (with images/bootstrap) preset
+# # NOTE: using this also requires using that image,
+# # ensuring you run your test under either the ENTRYPOINT or:
+# # /usr/local/bin/runner my-test-command --foo --bar
+# # AND setting the following on your PodSpec:
+# # securityContext:
+# #   privileged: true
+- labels:
+    preset-dind-enabled: "true"
+  env:
+  - name: DOCKER_IN_DOCKER_ENABLED
+    value: "true"
+  volumes:
+  - name: docker-graph
+    emptyDir: {}
+  volumeMounts:
+  - name: docker-graph
+    mountPath: /docker-graph
