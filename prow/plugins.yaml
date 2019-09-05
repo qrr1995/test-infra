@@ -17,3 +17,41 @@ plugins:
   - wip
   - hold
   - help
+
+  qrr1995/tidb-operator:
+  - size
+  - cat
+  - shrug
+  - pony
+  - approve
+  - lgtm
+  - slackevents
+  - trigger
+  - slackevents
+  - lifecycle
+  - blockade
+  - blunderbuss
+  - assign
+  - verify-owners
+  - wip
+  - hold
+  - help
+
+  pingcap/SRE:
+  - size
+  - cat
+  - shrug
+  - pony
+  - approve
+  - lgtm
+  - slackevents
+  - trigger
+  - slackevents
+  - lifecycle
+  - blockade
+  - blunderbuss
+  - assign
+  - verify-owners
+  - wip
+  - hold
+  - help
